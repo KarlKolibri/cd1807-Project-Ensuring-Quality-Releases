@@ -6,7 +6,7 @@ pool: MyAgentPool
 variables:
   python.version: "3.7.6"
 
-  azureServiceConnectionId: "myserviceconnection"
+  azureServiceConnectionId: "UdacityDS - 63"
 
   projectRoot: $(System.DefaultWorkingDirectory)
 
@@ -119,7 +119,7 @@ stages:
                 - task: AzureWebApp@1
                   displayName: "Deploy Azure Web App"
                   inputs:
-                    azureSubscription: "$(azureServiceConnectionId)"
+                    azure: "$(azureServiceConnectionId)"
                     appName: $(webAppName)
                     appType: "webApp"
                     package: "$(Pipeline.Workspace)/drop-fakerestapi/$(Build.BuildId)-fakerestapi.zip"
