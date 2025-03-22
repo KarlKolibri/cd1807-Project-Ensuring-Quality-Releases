@@ -6,7 +6,7 @@ pool: MyAgentPool
 variables:
   python.version: "3.7.6"
 
-  azureServiceConnectionId: "UdacityDS - 63"
+  azureServiceConnectionId: "myserviceconnection"
 
   projectRoot: $(System.DefaultWorkingDirectory)
 
