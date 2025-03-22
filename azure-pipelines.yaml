@@ -109,7 +109,7 @@ stages:
     jobs:
       - deployment: DeployFakeRestAPI
         displayName: "Deploy Webapp"
-        pool: myAgentPool
+        pool: MyAgentPool
         environment:
           name: "$(environmentName)"
         strategy:
@@ -129,7 +129,7 @@ stages:
     jobs:
       - job: Integration
         displayName: "Integration Tests"
-        pool: myAgentPool
+        pool: MyAgentPool
 
         steps:
           - task: Bash@3
@@ -174,7 +174,7 @@ stages:
 
       - job: Performance
         displayName: "Performance Tests"
-        pool: myAgentPool
+        pool: MyAgentPool
         steps:
           - task: Bash@3
             displayName: "Endurance Test Suite"
@@ -237,7 +237,7 @@ stages:
           # ToDo:
       - deployment: VMDeploy
         displayName: Selenium Tests
-        pool: myAgentPool
+        pool: MyAgentPool
         environment:
           name: "test"
           resourceType: VirtualMachine
