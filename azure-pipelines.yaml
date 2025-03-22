@@ -239,7 +239,7 @@ stages:
         displayName: Selenium Tests
         pool: MyAgentPool
         environment:
-          name: "test"
+          name: "linuxvm"
           resourceType: VirtualMachine
         strategy:
           runOnce:
