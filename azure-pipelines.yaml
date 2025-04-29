@@ -1,284 +1,73 @@
-trigger:
-  - main
+name: Azure Pipelines
 
-pool: MyAgentPool
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+trigger:
+- main
+
+# ToDo: Replace the agent pool name, if you are using Udacity Cloud lab. 
+# Otherwise comment out the line below. 
+pool: newpool
 
 variables:
-  python.version: "3.7.6"
-
-  azureServiceConnectionId: "myserviceconnection"
-
+  python.version: '3.7.6'
+  # ToDo: Replace the service connection name as used in the DevOps project settings
+  azureServiceConnectionId: 'azuda'
+  # Project root folder. Point to the folder containing manage.py file.
   projectRoot: $(System.DefaultWorkingDirectory)
-
-  environmentName: "linuxvm"
-  webAppName: "webapp-udap3"
+  # Environment name
+  environmentName: 'test'
 
 stages:
-  #--------------------------------------------#
-  # BUILD STAGE
-  #--------------------------------------------#
+- stage: Build
+  jobs:
+  - job: BuildInfrastructure
+    steps:
+    # Install Terraform on the pipeline agent 
+    - task: TerraformInstaller@0
+      displayName: 'Terrafom installation'
+      inputs:
+        terraformVersion: '1.2.9'
+    
+    # Run Terraform Init on the pipeline agent 
+    # ToDo: Replace the resource group name, storage account name, and container name below
+    - task: TerraformTaskV3@3
+      displayName: 'Terrafom init'
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/terraform/environments/test'
+        backendServiceArm: '$(azureServiceConnectionId)'
+        backendAzureRmResourceGroupName: 'Azuredevops'
+        backendAzureRmStorageAccountName: 'tfstate281845088'
+        backendAzureRmContainerName: 'tfstate'
+        backendAzureRmKey: 'test.terraform.tfstate'
 
-  
-  - stage: Infrastructure
-    jobs:
-      - job: BuildInfrastructure
-        steps:
-          - task: ms-devlabs.custom-terraform-tasks.custom-terraform-installer-task.TerraformInstaller@0
-            displayName: "Terrafom installation"
-            inputs:
-              terraformVersion: "1.2.9"
+    # Run Terraform Validate    
+    - task: TerraformTaskV3@3
+      displayName: Terraform validate
+      inputs:
+        provider: 'azurerm'
+        command: 'validate'
 
-          - task: ms-devlabs.custom-terraform-tasks.custom-terraform-release-task.TerraformTaskV3@3
-            displayName: "Terrafom init"
-            inputs:
-              provider: "azurerm"
-              command: "init"
-              workingDirectory: "$(System.DefaultWorkingDirectory)/terraform/environments/test"
-              backendServiceArm: "$(azureServiceConnectionId)"
-              backendAzureRmResourceGroupName: "Azuredevops"
-              backendAzureRmStorageAccountName: "tfstate329320667"
-              backendAzureRmContainerName: "tfstate"
-              backendAzureRmKey: "test.terraform.tfstate"
+    
+    # Run Terraform Apply
+    # ToDo: Change the workingDirectory path, as applicable to you
+    - task: TerraformTaskV3@3
+      displayName: Terraform apply
+      inputs:
+        provider: 'azurerm'
+        command: 'apply'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/terraform/environments/test'
+        environmentServiceNameAzureRM: '$(azureServiceConnectionId)'
 
-          - task: ms-devlabs.custom-terraform-tasks.custom-terraform-release-task.TerraformTaskV3@3
-            displayName: Terraform validate
-            inputs:
-              provider: "azurerm"
-              command: "validate"
-
-          # Run Terraform Apply
-          - task: ms-devlabs.custom-terraform-tasks.custom-terraform-release-task.TerraformTaskV3@3
-            displayName: Terraform apply
-            inputs:
-              provider: "azurerm"
-              command: "apply"
-              workingDirectory: "$(System.DefaultWorkingDirectory)/terraform/environments/test"
-              environmentServiceNameAzureRM: "$(azureServiceConnectionId)"
-
-          - task: ArchiveFiles@2
-            displayName: "Archive FakeRestAPI"
-            inputs:
-              rootFolderOrFile: "$(System.DefaultWorkingDirectory)/automatedtesting/jmeter/fakerestapi"
-              includeRootFolder: false
-              archiveType: "zip"
-              archiveFile: "$(Build.ArtifactStagingDirectory)/$(Build.BuildId)-fakerestapi.zip"
-
-          - task: PublishPipelineArtifact@1
-            displayName: Publish FakeRestAPI artifact
-            inputs:
-              targetPath: "$(Build.ArtifactStagingDirectory)/$(Build.BuildId)-fakerestapi.zip"
-              artifactName: "drop-fakerestapi"
-
-          - task: ArchiveFiles@2
-            displayName: "Archive Selenium"
-            inputs:
-              rootFolderOrFile: "$(System.DefaultWorkingDirectory)/automatedtesting/selenium"
-              includeRootFolder: false
-              archiveType: "zip"
-              archiveFile: "$(Build.ArtifactStagingDirectory)/selenium-$(Build.BuildId).zip"
-
-          - task: PublishPipelineArtifact@1
-            displayName: Publish Selenium artifact
-            inputs:
-              targetPath: "$(Build.ArtifactStagingDirectory)/selenium-$(Build.BuildId).zip"
-              artifactName: "drop-ui-tests"
-
-          - task: ArchiveFiles@2
-            displayName: "Archive Performance TestSuite"
-            inputs:
-              rootFolderOrFile: "$(System.DefaultWorkingDirectory)/automatedtesting/jmeter/testsuite"
-              includeRootFolder: false
-              archiveType: "zip"
-              archiveFile: "$(Build.ArtifactStagingDirectory)/$(Build.BuildId)-perftests.zip"
-
-              
-
-          - task: PublishPipelineArtifact@1
-            displayName: Publish Performance TestSuite
-            inputs:
-              targetPath: "$(Build.ArtifactStagingDirectory)/$(Build.BuildId)-perftests.zip"
-              artifactName: "drop-perftests"
-          # - publish: $(Build.ArtifactStagingDirectory)/$(Build.BuildId)-perftests.zip
-          #   displayName: "Upload Package"
-          #   artifact: "drop-perftests"
-
-
-
-
-  - stage: Deploy
-    jobs:
-      - deployment: DeployFakeRestAPI
-        displayName: "Deploy Webapp"
-        pool: MyAgentPool
-        environment:
-          name: "$(environmentName)"
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-                - task: AzureWebApp@1
-                  displayName: "Deploy Azure Web App"
-                  inputs:
-                    azure: "$(azureServiceConnectionId)"
-                    appName: $(webAppName)
-                    appType: "webApp"
-                    package: "$(Pipeline.Workspace)/drop-fakerestapi/$(Build.BuildId)-fakerestapi.zip"
-                    DeploymentType: zipDeploy
-
-  - stage: Tests
-    jobs:
-      - job: Integration
-        displayName: "Integration Tests"
-        pool: MyAgentPool
-
-        steps:
-          - task: Bash@3
-            displayName: "Install Postman & Newman"
-            inputs:
-              targetType: "inline"
-              script: |
-                #! /bin/bash
-                pwd
-                sudo snap install postman
-                sudo npm install -g newman
-                sudo npm install newman-reporter-junitfull -g
-
-          - task: Bash@3
-            displayName: "Regression Tests"
-            continueOnError: true
-            inputs:
-              workingDirectory: "$(System.DefaultWorkingDirectory)/automatedtesting/postman"
-              targetType: "inline"
-              script:
-                "newman run TestSuite.Regression.json -e Test.environment.json
-                --reporters cli,junit --reporter-junit-export
-                TEST-Regression.xml"
-
-          - task: Bash@3
-            displayName: "Data Validation Tests"
-            continueOnError: true
-            inputs:
-              workingDirectory: "$(System.DefaultWorkingDirectory)/automatedtesting/postman"
-              targetType: "inline"
-              script:
-                "newman run TestSuite.Data-Validation.json -e
-                Test.environment.json --reporters cli,junit
-                --reporter-junit-export TEST-DataValidation.xml"
-
-          - task: PublishTestResults@2
-            inputs:
-              testResultsFormat: "JUnit"
-              testResultsFiles: "**/TEST-*.xml"
-              testRunTitle: "Publish test results"
-              searchFolder: "$(System.DefaultWorkingDirectory)/automatedtesting/postman"
-
-      - job: Performance
-        displayName: "Performance Tests"
-        pool: MyAgentPool
-        steps:
-          - task: Bash@3
-            displayName: "Endurance Test Suite"
-            inputs:
-              targetType: "inline"
-              script: |
-                cd ~/
-                DIR=/home/devopsagent/testsuite
-                if [ ! -d "$DIR" ]; then
-                mkdir testsuite
-                fi
-                TAR_FILE="/home/devopsagent/myagent/_work/1/drop-perftests/$(Build.BuildId)-perftests.zip"
-                if [ -f "$TAR_FILE" ]; then
-                mv "$TAR_FILE" "$DIR"
-                else
-                echo "Tệp $TAR_FILE không tồn tại."
-                fi
-                mv /home/devopsagent/myagent/_work/1/drop-perftests/$(Build.BuildId)-perftests.zip testsuite
-                cd testsuite
-                unzip -o $(Build.BuildId)-perftests.zip
-                wget -q "https://dlcdn.apache.org//jmeter/binaries/apache-jmeter-5.6.3.tgz"
-                tar -xf apache-jmeter-5.6.3.tgz
-                rm -Rf endurance-test-report
-                ./apache-jmeter-5.6.3/bin/jmeter -n \
-                -t EnduranceTestSuite.jmx \
-                -l endurance-test-report/endurance-results.jtl \
-                -e \
-                -o endurance-test-report
-
-          - task: Bash@3
-            displayName: "Stress Test Suite"
-            inputs:
-              targetType: "inline"
-              script: |
-                cd ~/
-                DIR=/home/devopsagent/testsuite
-                if [ ! -d "$DIR" ]; then
-                mkdir testsuite
-                fi
-                cd testsuite
-                rm -Rf stress-test-report
-                ./apache-jmeter-5.6.3/bin/jmeter -n \
-                -t StressTestSuite.jmx \
-                -l stress-test-report/stress-results.jtl \
-                -e \
-                -o stress-test-report
-
-          - task: Bash@3
-            displayName: "Print Performance Test Logs"
-            inputs:
-              targetType: "inline"
-              workingDirectory: /home/devopsagent/testsuite
-              script: |
-                ls -lah endurance-test-report/
-                ls -lah stress-test-report/
-                cat jmeter.log
-
-          #--------------------------------------------#
-          # Selenium | Functional UI Tests
-          # ToDo:
-      - deployment: VMDeploy
-        displayName: Selenium Tests
-        pool: MyAgentPool
-        environment:
-          name: "linuxvm"
-          resourceType: VirtualMachine
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-                - download: current
-                  artifact: drop-ui-tests
-
-                - task: Bash@3
-                  inputs:
-                    targetType: "inline"
-                    script: |
-                      #! /bin/bash
-                      sudo apt-get upgrade -y
-                      sudo apt-get install python3-pip -y
-                      sudo apt-get install unzip -y
-                      sudo apt update && sudo  DEBIAN_FRONTEND=noninteractive apt upgrade chromium-browser
-                      sudo DEBIAN_FRONTEND=noninteractive apt install python3-venv -y
-                      python3 -m venv selenium_env
-                      source selenium_env/bin/activate
-                      pip install selenium
-                      sudo DEBIAN_FRONTEND=noninteractive apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get install xdg-utils
-                      cd ~/
-                      DIR=/home/adminuser/app
-                      if [ ! -d "$DIR" ]; then
-                          mkdir app
-                      fi
-                      mv /home/adminuser/azagent/_work/1/drop-ui-tests/selenium-$(Build.BuildId).zip app
-                      cd app
-                      unzip -o selenium-$(Build.BuildId).zip
-                      FILE=/home/adminuser/app/chromedriver_linux64.zip
-                      if [ ! -f "$FILE" ]; then
-                        LATEST=$(chromium-browser --product-version) # <------- HERE
-                         wget http://chromedriver.storage.googleapis.com/112.0.5615.49/chromedriver_linux64.zip
-                         unzip -o chromedriver-linux64.zip
-                         sudo ln -s $PWD/chromedriver /usr/local/bin/chromedriver
-                      fi
-                      export PATH=$PATH:/home/adminuser/app
-                      echo "Starting Selenium Tests"
-                      python3 add_remove_from_cart.py >> selenium.log
-                      echo "Completed Selenium Tests. Check selenium.log for results."
-                      cat selenium.log
+    # Destroy the resources in Azure
+    # ToDo: Change the workingDirectory path, as applicable to you
+    - task: TerraformTaskV3@3
+      displayName: Terraform destroy
+      inputs:
+        provider: 'azurerm'
+        command: 'destroy'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/terraform/environments/test'
+        environmentServiceNameAzureRM: '$(azureServiceConnectionId)'        
